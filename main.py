@@ -3,8 +3,8 @@ from telegram import Bot
 import os
 
 # Configuración desde variables de entorno
-TOKEN = os.getenv(8192659679:AAFeJGZXKqa3hsJFVf7dCf0d9YP518aatoQ)
-CHAT_ID = os.getenv(7349844639)
+TOKEN = os.getenv("TELEGRAM_TOKEN")
+CHAT_ID = os.getenv("CHAT_ID")
 MY_NUMBERS = [4, 8, 10, 13, 17, 33]
 
 # URL oficial resultados (Quini 6)
