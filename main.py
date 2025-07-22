@@ -25,17 +25,20 @@ def get_results():
 
         soup = BeautifulSoup(page.content, "html.parser")
 
-        # Buscar bloques de números
-        juegos = soup.find_all("ul", class_="numbers")
-
+        # Buscar listas de resultados dentro de los bloques principales
+        juegos = soup.select("div.resultado-juego ul")
         if not juegos or len(juegos) < 3:
             print("[ERROR] No se encontraron resultados en la página.")
             return None
 
-        # Extraer números de cada modalidad
-        tradicional = [int(n.text) for n in juegos[0].find_all("li")]
-        segunda = [int(n.text) for n in juegos[1].find_all("li")]
-        revancha = [int(n.text) for n in juegos[2].find_all("li")]
+        # Extraer números filtrando solo dígitos
+        tradicional = [int(n.text.strip()) for n in juegos[0].find_all("li") if n.text.strip().isdigit()]
+        segunda = [int(n.text.strip()) for n in juegos[1].find_all("li") if n.text.strip().isdigit()]
+        revancha = [int(n.text.strip()) for n in juegos[2].find_all("li") if n.text.strip().isdigit()]
+
+        if not tradicional or not segunda or not revancha:
+            print("[ERROR] No se pudieron extraer números válidos.")
+            return None
 
         print("[INFO] Resultados obtenidos correctamente.")
         return {
@@ -60,8 +63,8 @@ async def send_message(winners, error=False):
     bot = Bot(token=TOKEN)
 
     if error:
-        message = "⚠️ No se pudieron obtener los resultados del Quini 6. Revisar manualmente:\n" \
-                  "🔗 https://www.loteriasantafe.gov.ar/resultados/quini-6"
+        message = "⚠️ No se pudieron obtener los resultados del Quini 6.\n" \
+                  "🔗 Revisar manualmente: https://www.loteriasantafe.gov.ar/resultados/quini-6"
     else:
         message = "📢 Resultados Quini 6:\n\n"
         for modalidad, aciertos, nums in winners:
@@ -84,4 +87,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
