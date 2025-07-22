@@ -4,7 +4,7 @@ from bs4 import BeautifulSoup
 from telegram import Bot
 import asyncio
 
-# Variables de entorno (Railway)
+# Variables de entorno
 TOKEN = os.getenv("TELEGRAM_TOKEN")
 CHAT_ID = os.getenv("CHAT_ID")
 
@@ -14,7 +14,7 @@ MY_NUMBERS = [4, 8, 10, 13, 17, 33]
 # URL oficial de resultados
 URL = "https://www.loteriasantafe.gov.ar/resultados/quini-6"
 
-# ----------- OBTENER RESULTADOS (SCRAPING ROBUSTO) -------------
+# ----------- OBTENER RESULTADOS (DEBUG) -------------
 def get_results():
     try:
         print("[INFO] Obteniendo resultados desde Lotería Santa Fe...")
@@ -23,16 +23,22 @@ def get_results():
             print(f"[ERROR] HTTP {page.status_code}")
             return None
 
+        # Mostrar un fragmento del HTML para analizar
+        print("[DEBUG] Primeros 500 caracteres del HTML:")
+        print(page.text[:500])
+
         soup = BeautifulSoup(page.content, "html.parser")
 
-        # Buscar TODOS los números que están dentro de etiquetas <li>
+        # Buscar todos los números visibles en <li>
         all_numbers = [int(n.text.strip()) for n in soup.find_all("li") if n.text.strip().isdigit()]
+        print(f"[DEBUG] Cantidad de números encontrados: {len(all_numbers)}")
+        print(f"[DEBUG] Lista completa encontrada: {all_numbers}")
 
         if len(all_numbers) < 18:
-            print(f"[ERROR] Solo encontré {len(all_numbers)} números. Estructura inesperada.")
+            print("[ERROR] No hay suficientes números para extraer.")
             return None
 
-        # Tomamos los primeros 18 números (3 jugadas de 6 números)
+        # Tomamos los primeros 18 números para 3 jugadas
         tradicional = all_numbers[0:6]
         segunda = all_numbers[6:12]
         revancha = all_numbers[12:18]
