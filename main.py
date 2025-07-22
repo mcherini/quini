@@ -14,7 +14,7 @@ MY_NUMBERS = [4, 8, 10, 13, 17, 33]
 # URL oficial de resultados
 URL = "https://www.loteriasantafe.gov.ar/resultados/quini-6"
 
-# ----------- OBTENER RESULTADOS (SCRAPING REAL) -------------
+# ----------- OBTENER RESULTADOS (SCRAPING ROBUSTO) -------------
 def get_results():
     try:
         print("[INFO] Obteniendo resultados desde Lotería Santa Fe...")
@@ -25,22 +25,20 @@ def get_results():
 
         soup = BeautifulSoup(page.content, "html.parser")
 
-        # Buscar listas de resultados dentro de los bloques principales
-        juegos = soup.select("div.resultado-juego ul")
-        if not juegos or len(juegos) < 3:
-            print("[ERROR] No se encontraron resultados en la página.")
+        # Buscar TODOS los números que están dentro de etiquetas <li>
+        all_numbers = [int(n.text.strip()) for n in soup.find_all("li") if n.text.strip().isdigit()]
+
+        if len(all_numbers) < 18:
+            print(f"[ERROR] Solo encontré {len(all_numbers)} números. Estructura inesperada.")
             return None
 
-        # Extraer números filtrando solo dígitos
-        tradicional = [int(n.text.strip()) for n in juegos[0].find_all("li") if n.text.strip().isdigit()]
-        segunda = [int(n.text.strip()) for n in juegos[1].find_all("li") if n.text.strip().isdigit()]
-        revancha = [int(n.text.strip()) for n in juegos[2].find_all("li") if n.text.strip().isdigit()]
+        # Tomamos los primeros 18 números (3 jugadas de 6 números)
+        tradicional = all_numbers[0:6]
+        segunda = all_numbers[6:12]
+        revancha = all_numbers[12:18]
 
-        if not tradicional or not segunda or not revancha:
-            print("[ERROR] No se pudieron extraer números válidos.")
-            return None
+        print("[INFO] Resultados extraídos:", tradicional, segunda, revancha)
 
-        print("[INFO] Resultados obtenidos correctamente.")
         return {
             "Tradicional": tradicional,
             "Segunda": segunda,
@@ -87,3 +85,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
