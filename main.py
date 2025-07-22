@@ -1,57 +1,48 @@
 import os
 import requests
-from bs4 import BeautifulSoup
 from telegram import Bot
 import asyncio
 
-# Variables de entorno
+# Variables de entorno (Railway)
 TOKEN = os.getenv("TELEGRAM_TOKEN")
 CHAT_ID = os.getenv("CHAT_ID")
 
 # Tu jugada fija
 MY_NUMBERS = [4, 8, 10, 13, 17, 33]
 
-# URL oficial de resultados
-URL = "https://www.loteriasantafe.gov.ar/resultados/quini-6"
+# API confiable para resultados del Quini 6
+API_URL = "https://quinielas.ar/api/quini6"
 
-# ----------- OBTENER RESULTADOS (DEBUG) -------------
+# ----------- OBTENER RESULTADOS DESDE API -------------
 def get_results():
     try:
-        print("[INFO] Obteniendo resultados desde Lotería Santa Fe...")
-        page = requests.get(URL, timeout=10)
-        if page.status_code != 200:
-            print(f"[ERROR] HTTP {page.status_code}")
+        print("[INFO] Obteniendo resultados desde API...")
+        response = requests.get(API_URL, timeout=10)
+        if response.status_code != 200:
+            print(f"[ERROR] HTTP {response.status_code}")
             return None
 
-        # Mostrar un fragmento del HTML para analizar
-        print("[DEBUG] Primeros 500 caracteres del HTML:")
-        print(page.text[:500])
-
-        soup = BeautifulSoup(page.content, "html.parser")
-
-        # Buscar todos los números visibles en <li>
-        all_numbers = [int(n.text.strip()) for n in soup.find_all("li") if n.text.strip().isdigit()]
-        print(f"[DEBUG] Cantidad de números encontrados: {len(all_numbers)}")
-        print(f"[DEBUG] Lista completa encontrada: {all_numbers}")
-
-        if len(all_numbers) < 18:
-            print("[ERROR] No hay suficientes números para extraer.")
+        data = response.json()
+        if not data:
+            print("[ERROR] No hay datos en la respuesta del API.")
             return None
 
-        # Tomamos los primeros 18 números para 3 jugadas
-        tradicional = all_numbers[0:6]
-        segunda = all_numbers[6:12]
-        revancha = all_numbers[12:18]
+        tradicional = data.get("tradicional", [])
+        segunda = data.get("segunda", [])
+        revancha = data.get("revancha", [])
 
-        print("[INFO] Resultados extraídos:", tradicional, segunda, revancha)
+        if len(tradicional) < 6 or len(segunda) < 6 or len(revancha) < 6:
+            print("[ERROR] Resultados incompletos en API.")
+            return None
 
+        print("[INFO] Resultados obtenidos correctamente.")
         return {
             "Tradicional": tradicional,
             "Segunda": segunda,
             "Revancha": revancha
         }
     except Exception as e:
-        print(f"[ERROR] Falló el scraping: {e}")
+        print(f"[ERROR] Falló la obtención desde API: {e}")
         return None
 
 # ----------- CHEQUEAR RESULTADOS -------------
@@ -68,7 +59,7 @@ async def send_message(winners, error=False):
 
     if error:
         message = "⚠️ No se pudieron obtener los resultados del Quini 6.\n" \
-                  "🔗 Revisar manualmente: https://www.loteriasantafe.gov.ar/resultados/quini-6"
+                  "🔗 Revisar manualmente: https://quinielas.ar/quini6"
     else:
         message = "📢 Resultados Quini 6:\n\n"
         for modalidad, aciertos, nums in winners:
@@ -76,7 +67,7 @@ async def send_message(winners, error=False):
                 message += f"🎉 {modalidad}: {aciertos} aciertos ✅\nNúmeros: {nums}\n\n"
             else:
                 message += f"{modalidad}: {aciertos} aciertos\nNúmeros: {nums}\n\n"
-        message += "🔗 Ver sorteo: https://www.loteriasantafe.gov.ar/resultados/quini-6"
+        message += "🔗 Más info: https://quinielas.ar/quini6"
 
     await bot.send_message(chat_id=CHAT_ID, text=message)
 
