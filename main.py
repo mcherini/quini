@@ -21,39 +21,39 @@ async def send_message(text):
 def download_pdf():
     try:
         response = requests.get(PDF_URL, timeout=15)
-        if response.status_code != 200:
-            return None
-        return response.content
+        if response.status_code == 200:
+            return response.content
     except:
         return None
+    return None
 
 def extract_text_from_pdf(pdf_data):
-    # Convertimos el PDF en imágenes
     images = convert_from_bytes(pdf_data, dpi=200)
     full_text = ""
     for img in images:
-        # OCR con pytesseract
-        text = pytesseract.image_to_string(img, lang="spa")
-        full_text += text + "\n"
+        full_text += pytesseract.image_to_string(img, lang="spa") + "\n"
     return full_text
 
+def extract_section_numbers(text, section_name):
+    # Buscar la sección y tomar texto cercano (300 caracteres)
+    pattern = rf"{section_name}.*?((?:\d+\s*){{6,10}})"
+    match = re.search(pattern, text, re.DOTALL | re.IGNORECASE)
+    if match:
+        nums = re.findall(r"\b\d{1,2}\b", match.group(1))
+        nums = [int(n) for n in nums if 1 <= int(n) <= 45]
+        return nums[:6]
+    return []
+
 def parse_results(text):
-    try:
-        # Buscar números (1-2 dígitos) y filtrarlos (1-45)
-        all_numbers = re.findall(r"\b\d{1,2}\b", text)
-        all_numbers = [int(n) for n in all_numbers if 1 <= int(n) <= 45]
+    tradicional = extract_section_numbers(text, "TRADICIONAL PRIMER SORTEO")
+    segunda = extract_section_numbers(text, "TRADICIONAL LA SEGUNDA DEL QUINI")
+    revancha = extract_section_numbers(text, "REVANCHA")
+    siempre_sale = extract_section_numbers(text, "SIEMPRE SALE")
 
-        # Tomamos los primeros 24 números válidos
-        tradicional = all_numbers[0:6]
-        segunda = all_numbers[6:12]
-        revancha = all_numbers[12:18]
-        siempre_sale = all_numbers[18:24]
+    def aciertos(jugada):
+        return len(set(jugada) & set(MY_NUMBERS))
 
-        # Calcular aciertos
-        def aciertos(jugada):
-            return len(set(jugada) & set(MY_NUMBERS))
-
-        message = f"""
+    message = f"""
 📢 QUINI 6 - RESULTADOS OCR
 🎯 Tradicional: {' – '.join(map(str, tradicional))} ✅ Aciertos: {aciertos(tradicional)}
 🎯 La Segunda: {' – '.join(map(str, segunda))} ✅ Aciertos: {aciertos(segunda)}
@@ -64,9 +64,7 @@ def parse_results(text):
 
 🔗 PDF Oficial: {PDF_URL}
 """
-        return message.strip()
-    except Exception as e:
-        return f"[ERROR] Falló el OCR: {e}"
+    return message
 
 def main():
     pdf_data = download_pdf()
@@ -79,4 +77,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
