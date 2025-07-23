@@ -12,7 +12,6 @@ CHAT_ID = os.getenv("CHAT_ID")
 # Tu jugada personalizada
 MY_NUMBERS = [4, 8, 10, 13, 17, 33]
 
-# URL oficial del PDF (puede cambiar en cada sorteo)
 PDF_URL = "https://jasper2.loteriasantafe.gov.ar/Ejecutar_Reportes2.php?ruta_reporte=/Reports/CAS/Extractos_CAS/extrpp&formato=PDF&param_ID_sor=0314E762-02A3-4265-BE0E-BC51A25D5C1B"
 
 async def send_message(text):
@@ -21,7 +20,6 @@ async def send_message(text):
 
 def get_pdf_content():
     try:
-        print("[INFO] Descargando PDF oficial...")
         response = requests.get(PDF_URL, timeout=15)
         if response.status_code != 200:
             return None
@@ -29,54 +27,49 @@ def get_pdf_content():
         pdf_file = io.BytesIO(response.content)
         reader = PdfReader(pdf_file)
 
-        full_text = ""
+        text = ""
         for page in reader.pages:
-            full_text += page.extract_text() + "\n"
-        return full_text
+            text += page.extract_text() + "\n"
+        return text
     except:
         return None
 
-def extract_numbers_after(text, title):
-    """Busca un título y extrae los 6 números que siguen."""
-    pattern = rf"{title}\s*((?:\d{{1,2}}\s+){{6}})"
-    match = re.search(pattern, text)
-    if match:
-        return [n for n in match.group(1).split() if n.isdigit()]
-    return []
+def extract_numbers(text, title):
+    """Encuentra el título y toma los 6 números siguientes (1 a 45)."""
+    idx = text.find(title)
+    if idx == -1:
+        return []
+    fragment = text[idx: idx + 200]  # Toma un bloque grande después del título
+    numbers = re.findall(r"\b\d{1,2}\b", fragment)
+    numbers = [n for n in numbers if 1 <= int(n) <= 45]
+    return numbers[:6]
 
 def parse_results(text):
     try:
-        # Concurso y fecha
         concurso = re.search(r"CONCURSO Nº (\d+)", text)
         fecha = re.search(r"(\d{2} DE [A-ZÁÉÍÓÚa-záéíóú]+ DE \d{4})", text)
 
-        # Extraer números correctos usando títulos
-        tradicional = extract_numbers_after(text, "TRADICIONAL PRIMER SORTEO")
-        segunda = extract_numbers_after(text, "TRADICIONAL LA SEGUNDA DEL QUINI")
-        revancha = extract_numbers_after(text, "REVANCHA")
-        siempre_sale = extract_numbers_after(text, "SIEMPRE SALE")
+        # Extraer números correctos
+        tradicional = extract_numbers(text, "TRADICIONAL PRIMER SORTEO")
+        segunda = extract_numbers(text, "TRADICIONAL LA SEGUNDA DEL QUINI")
+        revancha = extract_numbers(text, "REVANCHA")
+        siempre_sale = extract_numbers(text, "SIEMPRE SALE")
 
-        # Pozo Extra y próximo pozo
         pozo_extra = re.search(r"PREMIO EXTRA\s*\$([\d\.\,]+)", text)
         prox_pozo = re.search(r"POZO ESTIMADO\s*\$([\d\.\,]+)", text)
 
         # Calcular aciertos
-        def contar_aciertos(jugada):
+        def aciertos(jugada):
             return len(set(map(int, jugada)) & set(MY_NUMBERS))
 
-        aciertos_trad = contar_aciertos(tradicional)
-        aciertos_seg = contar_aciertos(segunda)
-        aciertos_rev = contar_aciertos(revancha)
-        aciertos_ss = contar_aciertos(siempre_sale)
-
-        message = f"""
+        msg = f"""
 📢 QUINI 6 - CONCURSO {concurso.group(1) if concurso else 'N/D'}
 📆 {fecha.group(1) if fecha else 'Fecha no encontrada'}
 
-🎯 Tradicional: {' – '.join(tradicional)} ✅ Aciertos: {aciertos_trad}
-🎯 La Segunda: {' – '.join(segunda)} ✅ Aciertos: {aciertos_seg}
-🎯 Revancha: {' – '.join(revancha)} ✅ Aciertos: {aciertos_rev}
-🎯 Siempre Sale: {' – '.join(siempre_sale)} ✅ Aciertos: {aciertos_ss}
+🎯 Tradicional: {' – '.join(tradicional)} ✅ Aciertos: {aciertos(tradicional)}
+🎯 La Segunda: {' – '.join(segunda)} ✅ Aciertos: {aciertos(segunda)}
+🎯 Revancha: {' – '.join(revancha)} ✅ Aciertos: {aciertos(revancha)}
+🎯 Siempre Sale: {' – '.join(siempre_sale)} ✅ Aciertos: {aciertos(siempre_sale)}
 
 💰 Pozo Extra: ${pozo_extra.group(1) if pozo_extra else 'N/D'}
 💰 Próximo Pozo Estimado: ${prox_pozo.group(1) if prox_pozo else 'N/D'}
@@ -85,7 +78,7 @@ def parse_results(text):
 
 🔗 Ver PDF oficial: {PDF_URL}
 """
-        return message.strip()
+        return msg.strip()
     except Exception as e:
         return f"[ERROR] Falló el formateo: {e}"
 
