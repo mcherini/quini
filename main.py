@@ -7,14 +7,14 @@ from pdf2image import convert_from_bytes
 import pytesseract
 import re
 
-# Variables de entorno (Railway)
+# Variables de entorno
 TOKEN = os.getenv("TELEGRAM_TOKEN")
 CHAT_ID = os.getenv("CHAT_ID")
 
 # Tu jugada personalizada
 MY_NUMBERS = [4, 8, 10, 13, 17, 33]
 
-# URL del PDF oficial
+# URL del PDF oficial (cambia en cada sorteo)
 PDF_URL = "https://jasper2.loteriasantafe.gov.ar/Ejecutar_Reportes2.php?ruta_reporte=/Reports/CAS/Extractos_CAS/extrpp&formato=PDF&param_ID_sor=0314E762-02A3-4265-BE0E-BC51A25D5C1B"
 
 async def send_message(text):
@@ -38,38 +38,34 @@ def extract_text_from_pdf(pdf_data):
     return full_text
 
 def extract_section_numbers(text, section_name):
-    """Busca el bloque de una sección y toma 6 números después del título"""
-    pattern = rf"{section_name}(.{{0,500}})"  # Tomar 500 caracteres después del título
+    """Busca el título y toma los primeros 6 números, permitiendo 00."""
+    pattern = rf"{section_name}(.{{0,800}})"
     match = re.search(pattern, text, re.DOTALL | re.IGNORECASE)
     if match:
         nums = re.findall(r"\b\d{1,2}\b", match.group(1))
-        nums = [int(n) for n in nums if 1 <= int(n) <= 45]
-        # Si hay menos de 6, buscar en la zona siguiente
-        if len(nums) < 6:
-            extra_zone = text[text.find(match.group(1)) + len(match.group(1)):text.find(match.group(1)) + 800]
-            extra_nums = re.findall(r"\b\d{1,2}\b", extra_zone)
-            extra_nums = [int(n) for n in extra_nums if 1 <= int(n) <= 45]
-            nums.extend(extra_nums)
-        return nums[:6]
+        # Incluimos 0 (que será 00) y números 0-45
+        nums = [int(n) for n in nums if 0 <= int(n) <= 45]
+        nums = nums[:6]
+        # Formatear en dos dígitos (ej: 00, 04, 17)
+        return [f"{n:02d}" for n in nums]
     return []
 
 def parse_results(text):
-    # Extraer números para cada modalidad
+    # Extraer jugadas
     tradicional = extract_section_numbers(text, "TRADICIONAL PRIMER SORTEO")
     segunda = extract_section_numbers(text, "TRADICIONAL LA SEGUNDA DEL QUINI")
     revancha = extract_section_numbers(text, "REVANCHA")
     siempre_sale = extract_section_numbers(text, "SIEMPRE SALE")
 
-    # Calcular aciertos
     def aciertos(jugada):
-        return len(set(jugada) & set(MY_NUMBERS))
+        return len(set(int(n) for n in jugada) & set(MY_NUMBERS))
 
     message = f"""
 📢 QUINI 6 - RESULTADOS OCR
-🎯 Tradicional: {' – '.join(map(str, tradicional)) if tradicional else 'N/D'} ✅ Aciertos: {aciertos(tradicional)}
-🎯 La Segunda: {' – '.join(map(str, segunda)) if segunda else 'N/D'} ✅ Aciertos: {aciertos(segunda)}
-🎯 Revancha: {' – '.join(map(str, revancha)) if revancha else 'N/D'} ✅ Aciertos: {aciertos(revancha)}
-🎯 Siempre Sale: {' – '.join(map(str, siempre_sale)) if siempre_sale else 'N/D'} ✅ Aciertos: {aciertos(siempre_sale)}
+🎯 Tradicional: {' – '.join(tradicional) if tradicional else 'N/D'} ✅ Aciertos: {aciertos(tradicional)}
+🎯 La Segunda: {' – '.join(segunda) if segunda else 'N/D'} ✅ Aciertos: {aciertos(segunda)}
+🎯 Revancha: {' – '.join(revancha) if revancha else 'N/D'} ✅ Aciertos: {aciertos(revancha)}
+🎯 Siempre Sale: {' – '.join(siempre_sale) if siempre_sale else 'N/D'} ✅ Aciertos: {aciertos(siempre_sale)}
 
 🎟️ Tu jugada: {', '.join(map(str, MY_NUMBERS))}
 
