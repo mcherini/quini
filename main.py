@@ -23,8 +23,8 @@ def download_pdf():
         r = requests.get(PDF_URL, timeout=20)
         if r.status_code == 200:
             return r.content
-    except:
-        return None
+    except Exception as e:
+        print(f"[ERROR] No se pudo descargar el PDF: {e}")
     return None
 
 def extract_text_from_pdf(pdf_data):
@@ -35,13 +35,10 @@ def extract_text_from_pdf(pdf_data):
     return full_text
 
 def find_jugada(text, section, allow_zero=False):
-    # Ubicamos la sección
     idx = text.lower().find(section.lower())
     if idx == -1:
         return []
-    # Tomamos texto después del título
     snippet = text[idx: idx + 2000]
-    # Extraemos números (incluyendo 0)
     nums = re.findall(r"\b\d{1,2}\b", snippet)
     result = []
     for n in nums:
@@ -57,10 +54,20 @@ def find_jugada(text, section, allow_zero=False):
     return [f"{n:02d}" for n in result]
 
 def parse_results(text):
+    print("\n[DEBUG] TEXTO COMPLETO OCR (primeros 2000 caracteres):")
+    print(text[:2000])  # Mostramos los primeros 2000 caracteres para analizar estructura
+
+    # Extraemos jugadas
     tradicional = find_jugada(text, "TRADICIONAL PRIMER SORTEO")
     segunda = find_jugada(text, "TRADICIONAL LA SEGUNDA DEL QUINI", allow_zero=True)
     revancha = find_jugada(text, "REVANCHA")
     siempre_sale = find_jugada(text, "SIEMPRE SALE")
+
+    # Debug específico para REVANCHA
+    rev_idx = text.lower().find("revancha")
+    if rev_idx != -1:
+        print("\n[DEBUG] BLOQUE REVANCHA:")
+        print(text[rev_idx: rev_idx + 500])
 
     def aciertos(jugada):
         return len(set(int(n) for n in jugada) & set(MY_NUMBERS))
@@ -91,4 +98,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
