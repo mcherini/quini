@@ -14,7 +14,7 @@ CHAT_ID = os.getenv("CHAT_ID")
 # Tu jugada personalizada
 MY_NUMBERS = [4, 8, 10, 13, 17, 33]
 
-# URL del PDF oficial
+# URL PDF oficial
 PDF_URL = "https://jasper2.loteriasantafe.gov.ar/Ejecutar_Reportes2.php?ruta_reporte=/Reports/CAS/Extractos_CAS/extrpp&formato=PDF&param_ID_sor=0314E762-02A3-4265-BE0E-BC51A25D5C1B"
 
 async def send_message(text):
@@ -37,40 +37,47 @@ def extract_text_from_pdf(pdf_data):
         full_text += pytesseract.image_to_string(img, lang="spa") + "\n"
     return full_text
 
-def extract_section_numbers(text, section_name):
-    """Busca la sección y toma 6 números (0–45), permitiendo 00, eliminando duplicados y completando si faltan."""
-    pattern = rf"{section_name}(.{{0,800}})"
+def extract_section_numbers(text, section_name, allow_zero=False):
+    """Extrae números permitiendo 00 en La Segunda, valida y corrige si hay errores."""
+    pattern = rf"{section_name}(.{{0,1200}})"
     match = re.search(pattern, text, re.DOTALL | re.IGNORECASE)
-    if match:
-        nums = re.findall(r"\b\d{1,2}\b", match.group(1))
-        nums = [int(n) for n in nums if 0 <= int(n) <= 45]
+    if not match:
+        return []
 
-        # Eliminar duplicados manteniendo orden
-        seen = set()
-        unique_nums = []
-        for n in nums:
-            if n not in seen:
-                seen.add(n)
-                unique_nums.append(n)
+    nums = re.findall(r"\b\d{1,2}\b", match.group(1))
+    valid = []
+    for n in nums:
+        n_int = int(n)
+        if (allow_zero and 0 <= n_int <= 45) or (not allow_zero and 1 <= n_int <= 45):
+            valid.append(n_int)
 
-        # Si faltan números, buscar más adelante
-        if len(unique_nums) < 6:
-            extra_zone = text[text.find(match.group(1)) + len(match.group(1)):text.find(match.group(1)) + 1000]
-            extra_nums = re.findall(r"\b\d{1,2}\b", extra_zone)
-            for n in extra_nums:
-                n_int = int(n)
-                if 0 <= n_int <= 45 and n_int not in seen:
-                    unique_nums.append(n_int)
-                    seen.add(n_int)
+    # Si hay menos de 6 o muchos ceros raros, buscar grupo más adelante
+    if len(valid) < 6 or valid.count(0) > 1:
+        extra_nums = re.findall(r"\b\d{1,2}\b", text)
+        temp_group = []
+        for n in extra_nums:
+            n_int = int(n)
+            if 1 <= n_int <= 45:
+                temp_group.append(n_int)
+                if len(temp_group) == 6:
+                    break
+        valid = temp_group
 
-        # Formatear en dos dígitos
-        return [f"{n:02d}" for n in unique_nums[:6]]
-    return []
+    # Eliminar duplicados manteniendo orden
+    seen = set()
+    unique_nums = []
+    for n in valid:
+        if n not in seen:
+            seen.add(n)
+            unique_nums.append(n)
+
+    # Formatear en 2 dígitos
+    return [f"{n:02d}" for n in unique_nums[:6]]
 
 def parse_results(text):
     # Extraer jugadas
     tradicional = extract_section_numbers(text, "TRADICIONAL PRIMER SORTEO")
-    segunda = extract_section_numbers(text, "TRADICIONAL LA SEGUNDA DEL QUINI")
+    segunda = extract_section_numbers(text, "TRADICIONAL LA SEGUNDA DEL QUINI", allow_zero=True)
     revancha = extract_section_numbers(text, "REVANCHA")
     siempre_sale = extract_section_numbers(text, "SIEMPRE SALE")
 
@@ -91,10 +98,14 @@ def parse_results(text):
     return message
 
 def main():
+    print("[INFO] Descargando PDF...")
     pdf_data = download_pdf()
     if pdf_data:
+        print("[INFO] Procesando OCR...")
         text = extract_text_from_pdf(pdf_data)
+        print("[INFO] Analizando resultados...")
         parsed = parse_results(text)
+        print("[INFO] Enviando mensaje a Telegram...")
         asyncio.run(send_message(parsed))
     else:
         asyncio.run(send_message("⚠️ No se pudo descargar el PDF oficial."))
