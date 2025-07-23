@@ -38,7 +38,7 @@ def find_jugada(text, section, allow_zero=False):
     if idx == -1:
         return []
 
-    # Ampliamos rango a 4000 caracteres
+    # Aumentamos rango a 4000 caracteres
     snippet = text[idx: idx + 4000]
     nums = re.findall(r"\b\d{1,2}\b", snippet)
     result = []
@@ -53,7 +53,7 @@ def find_jugada(text, section, allow_zero=False):
         if len(result) == 6:
             break
 
-    # Si no encontramos, intentamos en TODO el texto
+    # Si no hay suficientes números, intentar globalmente después del título
     if len(result) < 6:
         extra_nums = re.findall(r"\b\d{1,2}\b", text[idx:])
         for n in extra_nums:
@@ -72,6 +72,38 @@ def find_jugada(text, section, allow_zero=False):
 def parse_results(text):
     tradicional = find_jugada(text, "TRADICIONAL PRIMER SORTEO")
     segunda = find_jugada(text, "TRADICIONAL LA SEGUNDA DEL QUINI", allow_zero=True)
-    revancha = find_jugada(text, "REVANCHA"_
+    revancha = find_jugada(text, "REVANCHA")
+    siempre_sale = find_jugada(text, "SIEMPRE SALE")
 
+    if not revancha:
+        revancha = ["VACANTE"]
 
+    def aciertos(jugada):
+        return len(set(int(n) for n in jugada if n.isdigit()) & set(MY_NUMBERS))
+
+    return f"""
+📢 QUINI 6 - RESULTADOS OCR
+🎯 Tradicional: {' – '.join(tradicional) if tradicional else 'N/D'} ✅ Aciertos: {aciertos(tradicional)}
+🎯 La Segunda: {' – '.join(segunda) if segunda else 'N/D'} ✅ Aciertos: {aciertos(segunda)}
+🎯 Revancha: {' – '.join(revancha)}
+🎯 Siempre Sale: {' – '.join(siempre_sale) if siempre_sale else 'N/D'} ✅ Aciertos: {aciertos(siempre_sale)}
+
+🎟️ Tu jugada: {', '.join(map(str, MY_NUMBERS))}
+
+🔗 PDF Oficial: {PDF_URL}
+"""
+
+def main():
+    print("[INFO] Descargando PDF...")
+    pdf_data = download_pdf()
+    if pdf_data:
+        print("[INFO] OCR en proceso...")
+        text = extract_text_from_pdf(pdf_data)
+        print("[INFO] Analizando resultados...")
+        msg = parse_results(text)
+        asyncio.run(send_message(msg))
+    else:
+        asyncio.run(send_message("⚠️ No se pudo descargar el PDF oficial."))
+
+if __name__ == "__main__":
+    main()
