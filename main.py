@@ -7,7 +7,7 @@ from bs4 import BeautifulSoup
 TOKEN = os.getenv("TELEGRAM_TOKEN")
 CHAT_ID = os.getenv("CHAT_ID")
 
-URL = "https://www.loteriasantafe.gov.ar/index.php/resultados/quini-6"
+URL = "https://www.google.com/search?q=quini6"
 
 async def send_message(text):
     bot = Bot(token=TOKEN)
