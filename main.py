@@ -87,6 +87,4 @@ def main():
         asyncio.run(send_message("⚠️ No se pudo descargar el PDF oficial."))
 
 if __name__ == "__main__":
-
-main()
-
+    main()
